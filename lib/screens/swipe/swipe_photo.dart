@@ -190,17 +190,11 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
       onDoubleTap: () async {
         HapticFeedback.lightImpact();
 
-        setState(() {
-          _showHeart = true;
-        });
 
         _heartCtrl.forward(from: 0);
 
         await Future.delayed(const Duration(milliseconds: 700));
 
-        setState(() {
-          _showHeart = false;
-        });
 
         _flyAndFire(PhotoAction.favorite, -900);
       },

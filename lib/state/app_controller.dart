@@ -3,6 +3,7 @@ import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/gallery_service.dart';
 import '../services/photo_mapper.dart';
+import '../services/hidden_photo_service.dart';
 
 /// Immutable snapshot of the whole app's navigation state. This mirrors the
 /// several `useState` calls at the top of the original `App()` component.
@@ -67,15 +68,13 @@ class AppState {
 
 class AppController extends StateNotifier<AppState> {
   final GalleryService _galleryService = GalleryService();
+  final HiddenPhotoService _hiddenPhotoService =
+      HiddenPhotoService();
 
-  /// Photos loaded from the real device gallery via [GalleryService] +
-  /// [PhotoMapper]. Stays `null` (falling back to mock_data) if permission
-  /// is denied, the gallery is empty, or loading fails for any reason.
   List<Photo>? _galleryPhotos;
 
-  /// Read-only access to the loaded gallery photos, if any. `null` means
-  /// no real gallery data is available yet and callers should fall back
-  /// to mock_data.
+  Set<String> _hiddenPhotoIds = {};
+
   List<Photo>? get galleryPhotos => _galleryPhotos;
 
   AppController() : super(AppState.initial()) {
@@ -91,17 +90,33 @@ class AppController extends StateNotifier<AppState> {
     try {
       final DateTime threeMonthsAgo =
           DateTime.now().subtract(const Duration(days: 90));
-      final albums = await _galleryService.getAlbums(createdAfter: threeMonthsAgo);
+
+      final albums =
+          await _galleryService.getAlbums(createdAfter: threeMonthsAgo);
+
       for (final album in albums) {
         final assets = await _galleryService.getAssetsFromAlbum(album);
+
         final withinWindow = assets.where((a) {
           final DateTime? createdAt = a.createDateTime;
-          return createdAt != null && !createdAt.isBefore(threeMonthsAgo);
+          return createdAt != null &&
+              !createdAt.isBefore(threeMonthsAgo);
         }).toList();
-        if (withinWindow.isNotEmpty) {
-          _galleryPhotos = PhotoMapper.fromAssetEntities(withinWindow);
 
-          // Trigger rebuild supaya GalleryScreen memakai foto asli.
+        if (withinWindow.isNotEmpty) {
+          final mappedPhotos =
+              PhotoMapper.fromAssetEntities(withinWindow);
+
+          _hiddenPhotoIds =
+              await _hiddenPhotoService.getHiddenIds();
+
+          _galleryPhotos = mappedPhotos
+              .where(
+                (photo) =>
+                    !_hiddenPhotoIds.contains(photo.id.toString()),
+              )
+              .toList();
+
           state = state.copyWith(
             activeTab: state.activeTab,
           );
@@ -110,7 +125,7 @@ class AppController extends StateNotifier<AppState> {
         }
       }
     } catch (_) {
-      // Permission denied or any failure — keep using mock_data.
+      // Permission denied or any failure.
     }
   }
 
@@ -142,21 +157,57 @@ class AppController extends StateNotifier<AppState> {
 
   void selectReviewMode(ReviewMode mode) {
     if (mode == ReviewMode.date) {
-      state = state.copyWith(screen: AppScreen.reviewDate);
+      state = state.copyWith(
+        screen: AppScreen.reviewDate,
+      );
       return;
     }
+
     if (mode == ReviewMode.location) {
-      state = state.copyWith(screen: AppScreen.reviewLocation);
+      state = state.copyWith(
+        screen: AppScreen.reviewLocation,
+      );
       return;
     }
+
     final List<Photo>? gallery = _galleryPhotos;
-    final bool useGallery = gallery != null && gallery.isNotEmpty;
+    final bool useGallery =
+        gallery != null && gallery.isNotEmpty;
+
     final Map<ReviewMode, SwipeContext> configs = {
-      ReviewMode.duplicates: SwipeContext(mode: mode, title: 'Duplicates', subtitle: '47 sets · 94 photos', photos: useGallery ? gallery : baliPhotos, total: 94),
-      ReviewMode.screenshots: SwipeContext(mode: mode, title: 'Screenshots', subtitle: '234 found', photos: useGallery ? gallery : tokyoPhotos, total: 234),
-      ReviewMode.largeVideos: SwipeContext(mode: mode, title: 'Large Videos', subtitle: '12 videos · 1.8 GB', photos: useGallery ? gallery : bandungPhotos, total: 12),
-      ReviewMode.surprise: SwipeContext(mode: mode, title: 'Surprise Me', subtitle: 'Random selection', photos: useGallery ? gallery : surprisePhotos, total: 48),
+      ReviewMode.duplicates: SwipeContext(
+        mode: mode,
+        title: 'Duplicates',
+        subtitle: '47 sets · 94 photos',
+        photos: useGallery ? gallery : baliPhotos,
+        total: 94,
+      ),
+
+      ReviewMode.screenshots: SwipeContext(
+        mode: mode,
+        title: 'Screenshots',
+        subtitle: '234 found',
+        photos: useGallery ? gallery : tokyoPhotos,
+        total: 234,
+      ),
+
+      ReviewMode.largeVideos: SwipeContext(
+        mode: mode,
+        title: 'Large Videos',
+        subtitle: '12 videos · 1.8 GB',
+        photos: useGallery ? gallery : bandungPhotos,
+        total: 12,
+      ),
+
+      ReviewMode.surprise: SwipeContext(
+        mode: mode,
+        title: 'Surprise Me',
+        subtitle: 'Random selection',
+        photos: useGallery ? gallery : surprisePhotos,
+        total: 48,
+      ),
     };
+
     _enterSwipe(configs[mode]!);
   }
 
@@ -166,6 +217,52 @@ class AppController extends StateNotifier<AppState> {
 
   void startLocationGroup(LocationGroup g) {
     _enterSwipe(SwipeContext(mode: ReviewMode.location, title: g.location, subtitle: g.date, photos: g.photos, total: g.count));
+  }
+  Future<void> hidePhotos(List<Photo> photos) async {
+    if (photos.isEmpty) return;
+
+    final ids = photos
+        .map((photo) => photo.id.toString())
+        .toList();
+
+    await _hiddenPhotoService.hideMany(ids);
+
+    _hiddenPhotoIds.addAll(ids);
+
+    if (_galleryPhotos != null) {
+      _galleryPhotos = _galleryPhotos!
+          .where(
+            (photo) => !_hiddenPhotoIds.contains(photo.id.toString()),
+          )
+          .toList();
+    }
+
+    state = state.copyWith(
+      activeTab: state.activeTab,
+    );
+  }
+
+  Future<void> restorePhotos(List<Photo> photos) async {
+    if (photos.isEmpty) return;
+
+    final ids = photos
+        .map((photo) => photo.id.toString())
+        .toList();
+
+    await _hiddenPhotoService.restoreMany(ids);
+
+    _hiddenPhotoIds.removeAll(ids);
+
+    if (_galleryPhotos != null) {
+      _galleryPhotos = [
+        ..._galleryPhotos!,
+        ...photos,
+      ];
+    }
+
+    state = state.copyWith(
+      activeTab: state.activeTab,
+    );
   }
 
   void swipeDone(ReviewResult result) {
@@ -199,36 +296,66 @@ class AppController extends StateNotifier<AppState> {
       screen: AppScreen.deleteQueue,
     );
   }
-  void restoreSelected(List<int> indexes) {
+  Future<void> restoreSelected(List indexes) async {
     final queue = [...state.deleteQueue];
 
-    indexes.sort((a, b) => b.compareTo(a));
+    final selectedPhotos = <Photo>[];
 
-    for (final i in indexes) {
-      if (i >= 0 && i < queue.length) {
-        queue.removeAt(i);
+    for (final index in indexes) {
+      if (index >= 0 && index < queue.length) {
+        selectedPhotos.add(queue[index]);
       }
     }
 
-    state = state.copyWith(deleteQueue: queue);
-  }
+    if (selectedPhotos.isEmpty) return;
 
-  void deleteSelected(List<int> indexes) {
-    final queue = [...state.deleteQueue];
+    await restorePhotos(selectedPhotos);
 
-    indexes.sort((a, b) => b.compareTo(a));
+    final sortedIndexes = [...indexes]
+      ..sort((a, b) => b.compareTo(a));
 
-    for (final i in indexes) {
-      if (i >= 0 && i < queue.length) {
-        queue.removeAt(i);
+    for (final index in sortedIndexes) {
+      if (index >= 0 && index < queue.length) {
+        queue.removeAt(index);
       }
     }
 
-    state = state.copyWith(deleteQueue: queue);
+    state = state.copyWith(
+      deleteQueue: queue,
+    );
   }
-  /// Used by the Review-by-date / Review-by-location back buttons.
-  void backToReviewMenu() => state = state.copyWith(screen: AppScreen.reviewMenu);
-}
+
+  Future<void> deleteSelected(List indexes) async {
+    final queue = [...state.deleteQueue];
+
+    final selectedPhotos = <Photo>[];
+
+    for (final index in indexes) {
+      if (index >= 0 && index < queue.length) {
+        selectedPhotos.add(queue[index]);
+      }
+    }
+
+    if (selectedPhotos.isEmpty) return;
+
+    await hidePhotos(selectedPhotos);
+
+    final sortedIndexes = [...indexes]
+      ..sort((a, b) => b.compareTo(a));
+
+    for (final index in sortedIndexes) {
+      if (index >= 0 && index < queue.length) {
+        queue.removeAt(index);
+      }
+    }
+
+    state = state.copyWith(
+      deleteQueue: queue,
+    );
+  }
+    /// Used by the Review-by-date / Review-by-location back buttons.
+    void backToReviewMenu() => state = state.copyWith(screen: AppScreen.reviewMenu);
+  }
 
 final appControllerProvider = StateNotifierProvider<AppController, AppState>(
   (ref) => AppController(),
