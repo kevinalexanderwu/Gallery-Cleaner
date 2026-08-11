@@ -32,13 +32,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
   
   bool _detailsOpen = false;
 
-  Photo? _lastPhoto;
-  PhotoAction? _lastAction;
 
   void _handleAction(PhotoAction action) {
     final photo = widget.ctx.photos[_idx];
-    _lastPhoto = photo;
-    _lastAction = action;
 
 
     switch (action) {
@@ -83,42 +79,33 @@ class _SwipeScreenState extends State<SwipeScreen> {
     final photo = widget.ctx.photos[_idx];
 
     _favoritePhotos.add(photo);
-
-    _handleAction(PhotoAction.keep);
-  }
-
-  void _undoLastAction() {
-    if (_lastPhoto == null || _lastAction == null) return;
-
-    switch (_lastAction!) {
-      case PhotoAction.keep:
-        _keptPhotos.removeLast();
-        break;
-
-      case PhotoAction.delete:
-        _deletePhotos.removeLast();
-        break;
-
-      case PhotoAction.favorite:
-        _favoritePhotos.removeLast();
-        break;
-
-      case PhotoAction.later:
-        _laterPhotos.removeLast();
-        break;
-    }
+    _keptPhotos.add(photo);
 
     setState(() {
+      _detailsOpen = false;
+
       _counts = {
         ..._counts,
-        _lastAction!: (_counts[_lastAction!] ?? 1) - 1,
+        PhotoAction.keep:
+            (_counts[PhotoAction.keep] ?? 0) + 1,
+        PhotoAction.favorite:
+            (_counts[PhotoAction.favorite] ?? 0) + 1,
       };
-
-      _idx--;
     });
 
-    _lastPhoto = null;
-    _lastAction = null;
+    if (_idx >= widget.ctx.photos.length - 1) {
+      widget.onDone(
+        ReviewResult(
+          counts: _counts,
+          deletePhotos: _deletePhotos,
+          keptPhotos: _keptPhotos,
+          laterPhotos: _laterPhotos,
+          favoritePhotos: _favoritePhotos,
+        ),
+      );
+    } else {
+      setState(() => _idx++);
+    }
   }
   void _finishReview() {
     widget.onDone(

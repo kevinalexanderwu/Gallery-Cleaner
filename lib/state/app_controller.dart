@@ -14,6 +14,7 @@ class AppState {
   final Map<PhotoAction, int> reviewCounts;
   final ReviewResult? reviewResult;
   final List<Photo> deleteQueue;
+  final bool galleryLoading;
 
   const AppState({
     required this.screen,
@@ -22,10 +23,12 @@ class AppState {
     required this.reviewCounts,
     required this.deleteQueue,
     required this.reviewResult,
+    required this.galleryLoading,
   });
 
   factory AppState.initial() => const AppState(
         screen: AppScreen.splash,
+        galleryLoading: true,
         activeTab: TabName.gallery,
         swipeCtx: null,
         reviewResult: null,
@@ -54,6 +57,7 @@ class AppState {
     Map<PhotoAction, int>? reviewCounts,
     ReviewResult? reviewResult,
     List<Photo>? deleteQueue,
+    bool? galleryLoading,
   }) {
     return AppState(
       reviewResult: reviewResult ?? this.reviewResult,
@@ -62,6 +66,7 @@ class AppState {
       swipeCtx: clearSwipeCtx ? null : (swipeCtx ?? this.swipeCtx),
       reviewCounts: reviewCounts ?? this.reviewCounts,
       deleteQueue: deleteQueue ?? this.deleteQueue,
+      galleryLoading: galleryLoading ?? this.galleryLoading,
     );
   }
 }
@@ -104,21 +109,10 @@ class AppController extends StateNotifier<AppState> {
         }).toList();
 
         if (withinWindow.isNotEmpty) {
-          final mappedPhotos =
-              PhotoMapper.fromAssetEntities(withinWindow);
-
-          _hiddenPhotoIds =
-              await _hiddenPhotoService.getHiddenIds();
-
-          _galleryPhotos = mappedPhotos
-              .where(
-                (photo) =>
-                    !_hiddenPhotoIds.contains(photo.id.toString()),
-              )
-              .toList();
+          _galleryPhotos = PhotoMapper.fromAssetEntities(withinWindow);
 
           state = state.copyWith(
-            activeTab: state.activeTab,
+            galleryLoading: false,
           );
 
           return;

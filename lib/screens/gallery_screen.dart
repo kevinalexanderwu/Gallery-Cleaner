@@ -13,9 +13,13 @@ class GalleryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(appControllerProvider);
-    final List<Photo>? realPhotos = ref.read(appControllerProvider.notifier).galleryPhotos;
-    final bool useRealPhotos = realPhotos != null && realPhotos.isNotEmpty;
+    final state = ref.watch(appControllerProvider);
+    final List<Photo>? realPhotos =
+        ref.read(appControllerProvider.notifier).galleryPhotos;
+
+    final bool loading = state.galleryLoading;
+    final bool useRealPhotos =
+        realPhotos != null && realPhotos.isNotEmpty;
 
     return Container(
       color: Colors.white,
@@ -62,15 +66,33 @@ class GalleryScreen extends ConsumerWidget {
               ],
             ),
           ),
-          if (useRealPhotos)
+          if (loading)
+            const Padding(
+              padding: EdgeInsets.only(top: 80),
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (useRealPhotos)
             for (final entry in _groupByMonth(realPhotos).entries)
               _MonthSectionPhotos(
-                  month: entry.key,
-                  photos: entry.value,
-                  onReview: onReview,
+                month: entry.key,
+                photos: entry.value,
+                onReview: onReview,
               )
           else
-            for (final g in galleryGroups) _MonthSection(group: g),
+            const Padding(
+              padding: EdgeInsets.only(top: 80),
+              child: Center(
+                child: Text(
+                  'No photos found',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.grey500,
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 24),
         ],
       ),

@@ -53,6 +53,7 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
   _DragDir? _dragDir;
   double _intensity = 0;
   DragAxis _axis = DragAxis.none;
+  bool _showHeart = false;
   static const double _dist = 72;
   static const double _vel = 380;
 
@@ -68,9 +69,21 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
   void _onPanStart(DragStartDetails d) {
     _xCtrl.stop();
     _yCtrl.stop();
+
+    if (_heartCtrl.isAnimating) {
+      _heartCtrl.stop();
+    }
+
+    _heartCtrl.value = 0;
+
+    if (_showHeart) {
+      setState(() {
+        _showHeart = false;
+      });
+    }
+
     _axis = DragAxis.none;
   }
-
   void _onPanUpdate(DragUpdateDetails d) {
     if (_axis == DragAxis.none) {
       if (d.delta.dx.abs() > 2 || d.delta.dy.abs() > 2) {
@@ -143,40 +156,96 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
   }
 
   void _onPanEnd(DragEndDetails d) {
-    final ox = _xCtrl.value, oy = _yCtrl.value;
-    final absX = ox.abs(), absY = oy.abs();
+    final ox = _xCtrl.value;
+    final oy = _yCtrl.value;
+
+    final absX = ox.abs();
+    final absY = oy.abs();
+
     final v = d.velocity.pixelsPerSecond;
 
     if (absY >= absX) {
+      // Swipe UP → KEEP
       if (oy < -_dist || v.dy < -_vel) {
-        _flyAndFire(PhotoAction.keep, -900);
-      } else if (oy > _dist || v.dy > _vel) {
-        _flyAndFire(PhotoAction.delete, 900);
-      } else {
+        _flyAndFire(
+          PhotoAction.keep,
+          -900,
+        );
+      }
+
+      // Swipe DOWN → DELETE
+      else if (oy > _dist || v.dy > _vel) {
+        _flyAndFire(
+          PhotoAction.delete,
+          900,
+        );
+      }
+
+      // Not far enough → return to center
+      else {
         setState(() {
           _dragDir = null;
           _intensity = 0;
         });
-        _springTo(_yCtrl, 0, v.dy);
-        _springTo(_xCtrl, 0, v.dx);
+
+        _springTo(
+          _yCtrl,
+          0,
+          v.dy,
+        );
+
+        _springTo(
+          _xCtrl,
+          0,
+          v.dx,
+        );
       }
     } else {
-      if (ox > 52 || v.dx > 280) {
-        _springTo(_xCtrl, 0, v.dx);
+      // Swipe LEFT → FOR LATER
+      if (ox < -_dist || v.dx < -_vel) {
+        _flyAndFire(
+          PhotoAction.later,
+          -900,
+        );
+      }
+
+      // Swipe RIGHT → DETAILS
+      else if (ox > 52 || v.dx > 280) {
+        _springTo(
+          _xCtrl,
+          0,
+          v.dx,
+        );
+
         setState(() {
           _dragDir = null;
           _intensity = 0;
         });
+
         widget.onOpenDetails();
-      } else {
+      }
+
+      // Not far enough → return to center
+      else {
         setState(() {
           _dragDir = null;
           _intensity = 0;
         });
-        _springTo(_xCtrl, 0, v.dx);
-        _springTo(_yCtrl, 0, v.dy);
+
+        _springTo(
+          _xCtrl,
+          0,
+          v.dx,
+        );
+
+        _springTo(
+          _yCtrl,
+          0,
+          v.dy,
+        );
       }
     }
+
     _axis = DragAxis.none;
   }
 
@@ -187,17 +256,28 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
 
 
     return GestureDetector(
-      onDoubleTap: () async {
-        HapticFeedback.lightImpact();
+    onDoubleTap: () async {
+      HapticFeedback.mediumImpact();
 
+      setState(() {
+        _showHeart = true;
+      });
 
-        _heartCtrl.forward(from: 0);
+      await Future.delayed(
+        const Duration(milliseconds: 1200),
+      );
 
-        await Future.delayed(const Duration(milliseconds: 700));
+      if (!mounted) return;
 
+      setState(() {
+        _showHeart = false;
+      });
 
-        _flyAndFire(PhotoAction.favorite, -900);
-      },
+      _flyAndFire(
+        PhotoAction.favorite,
+        -900,
+      );
+    },
       onPanStart: _onPanStart,
       onPanUpdate: _onPanUpdate,
       onPanEnd: _onPanEnd,
@@ -219,59 +299,25 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              AnimatedBuilder(
-                animation: _heartCtrl,
-                builder: (context, child) {
-                  final t = _heartCtrl.value;
-
-                  double opacity;
-                  if (t < 0.65) {
-                    opacity = 1;
-                  } else {
-                    opacity = (1 - ((t - 0.65) / 0.35)).clamp(0.0, 1.0);
-                  }
-
-                  final scale = Tween<double>(
-                    begin: 0.3,
-                    end: 1.0,
-                  ).transform(
-                    Curves.easeOutBack.transform(
-                      (t.clamp(0.0, 0.35)) / 0.35,
-                    ),
-                  );
-
-                  return IgnorePointer(
-                    child: Opacity(
-                      opacity: opacity,
-                      child: Center(
-                        child: Transform.scale(
-                          scale: scale,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: const [
-                              Icon(
-                                Icons.favorite,
-                                color: Colors.white,
-                                size: 145,
-                              ),
-                              Icon(
-                                Icons.favorite,
-                                color: Color(0xFFE53935),
-                                size: 120,
-                              ),
-                            ],
-                          )
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
               NetImage(
                 url: widget.photo.url,
                 asset: widget.photo.asset,
                 original: true,
               ),
+                if (_showHeart)
+                  IgnorePointer(
+                    child: Center(
+                      child: Transform.scale(
+                        scale: 1.0,
+                        child: const Icon(
+                          Icons.favorite,
+                          color: Colors.red,
+                          size: 90,
+                        ),
+                      ),
+                    ),
+                  ),
+
               if (_dragDir == _DragDir.up)
                 Positioned(
                   top: 28,
@@ -314,6 +360,40 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
                         child: const Text(
                           'DETAILS',
                           style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.4),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (_dragDir == _DragDir.left)
+                Positioned(
+                  left: 20,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Opacity(
+                      opacity: _intensity,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.7),
+                            width: 2,
+                          ),
+                        ),
+                        child: const Text(
+                          'FOR LATER',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.4,
+                          ),
                         ),
                       ),
                     ),

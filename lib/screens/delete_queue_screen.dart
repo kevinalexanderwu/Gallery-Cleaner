@@ -37,27 +37,43 @@ class _DeleteQueueScreenState extends State<DeleteQueueScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: widget.onBack,
+          onPressed: () {
+            if (_selectionMode) {
+              setState(() {
+                _selectionMode = false;
+                _selected.clear();
+              });
+              return;
+            }
+
+            widget.onBack();
+          },
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              setState(() {
-                if (_selected.length == widget.photos.length) {
-                  _selected.clear();
-                } else {
-                  _selected
-                    ..clear()
-                    ..addAll(List.generate(widget.photos.length, (i) => i));
-                }
-              });
-            },
-            child: Text(
-              _selected.length == widget.photos.length
-                  ? "Clear"
-                  : "Select All",
+          if (_selectionMode)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  if (_selected.length == widget.photos.length) {
+                    _selected.clear();
+                  } else {
+                    _selected
+                      ..clear()
+                      ..addAll(
+                        List.generate(
+                          widget.photos.length,
+                          (i) => i,
+                        ),
+                      );
+                  }
+                });
+              },
+              child: Text(
+                _selected.length == widget.photos.length
+                    ? "Clear"
+                    : "Select All",
+              ),
             ),
-          ),
         ],
       ),
       body: widget.photos.isEmpty
@@ -204,31 +220,31 @@ class _DeleteQueueScreenState extends State<DeleteQueueScreen> {
                               Positioned(
                                 top: 8,
                                 right: 8,
-                              child: CircleAvatar(
-                                radius: 11,
-                                backgroundColor: selected
-                                    ? Colors.red
-                                    : Colors.white,
-                                child: Icon(
-                                  selected
-                                      ? Icons.check
-                                      : Icons.circle_outlined,
-                                  size: 15,
-                                  color: selected
-                                      ? Colors.white
-                                      : Colors.grey,
+                                child: CircleAvatar(
+                                  radius: 11,
+                                  backgroundColor: selected
+                                      ? Colors.red
+                                      : Colors.white,
+                                  child: Icon(
+                                    selected
+                                        ? Icons.check
+                                        : Icons.circle_outlined,
+                                    size: 15,
+                                    color: selected
+                                        ? Colors.white
+                                        : Colors.grey,
+                                  ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ),
-                      );
-                    },
-                  ),
+                    );
+                  },
                 ),
-              ],
-            ),
-    );
+              ),
+            ],
+          ),
+         );
   }
 }
