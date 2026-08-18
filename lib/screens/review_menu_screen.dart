@@ -68,17 +68,10 @@ class ReviewMenuScreen extends ConsumerWidget {
         icon: Icons.location_on_outlined,
       ),
 
-      const _ReviewModeItem(
-        id: ReviewMode.duplicates,
-        label: 'Review Duplicates',
-        hint: 'Coming Soon',
-        icon: Icons.content_copy_outlined,
-      ),
-
-      const _ReviewModeItem(
+      _ReviewModeItem(
         id: ReviewMode.screenshots,
         label: 'Review Screenshots',
-        hint: 'Coming Soon',
+        hint: '${ref.read(appControllerProvider.notifier).screenshotPhotos.length} screenshots',
         icon: Icons.image_outlined,
       ),
 

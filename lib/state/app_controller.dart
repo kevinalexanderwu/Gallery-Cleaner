@@ -88,6 +88,10 @@ class AppController extends StateNotifier<AppState> {
   Set<String> get hiddenPhotoUrls => _hiddenPhotoUrls;
   List<Photo>? get galleryPhotos => _galleryPhotos;
 
+  List<Photo> _screenshotPhotos = [];
+
+  List<Photo> get screenshotPhotos => _screenshotPhotos;
+
   AppController() : super(AppState.initial()) {
     _loadGalleryPhotos();
   }
@@ -134,6 +138,16 @@ class AppController extends StateNotifier<AppState> {
 
           debugPrint(
             'GALLERY: loaded ${_galleryPhotos!.length} photos',
+          );
+
+          final screenshotAssets =
+              await _galleryService.filterScreenshots(withinWindow);
+
+          _screenshotPhotos =
+              PhotoMapper.fromAssetEntities(screenshotAssets);
+
+          debugPrint(
+            'GALLERY: found ${_screenshotPhotos.length} screenshots',
           );
 
           state = state.copyWith(
@@ -216,9 +230,9 @@ class AppController extends StateNotifier<AppState> {
       ReviewMode.screenshots: SwipeContext(
         mode: mode,
         title: 'Screenshots',
-        subtitle: '234 found',
-        photos: useGallery ? gallery : tokyoPhotos,
-        total: 234,
+        subtitle: '${_screenshotPhotos.length} found',
+        photos: _screenshotPhotos,
+        total: _screenshotPhotos.length,
       ),
 
       ReviewMode.largeVideos: SwipeContext(

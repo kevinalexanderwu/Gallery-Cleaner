@@ -61,4 +61,44 @@ class GalleryService {
     if (count == 0) return [];
     return album.getAssetListRange(start: 0, end: count);
   }
+
+  Future<List<AssetEntity>> filterScreenshots(
+    List<AssetEntity> assets,
+  ) async {
+    final List<AssetEntity> screenshots = [];
+
+    for (final asset in assets) {
+      final file = await asset.file;
+
+      if (file == null) continue;
+
+      final path = file.path.toLowerCase();
+
+      if (path.contains('screenshot')) {
+        screenshots.add(asset);
+      }
+    }
+
+    return screenshots;
+  }
+}
+
+Future<List<AssetEntity>> filterScreenshots(
+  List<AssetEntity> assets,
+) async {
+  final List<AssetEntity> screenshots = [];
+
+  for (final asset in assets) {
+    final file = await asset.file;
+
+    if (file == null) continue;
+
+    final path = file.path.toLowerCase();
+
+    if (path.contains('screenshot')) {
+      screenshots.add(asset);
+    }
+  }
+
+  return screenshots;
 }
