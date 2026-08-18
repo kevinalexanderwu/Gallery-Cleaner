@@ -5,6 +5,9 @@ import '../services/gallery_service.dart';
 import '../services/photo_mapper.dart';
 import '../services/hidden_photo_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:photo_manager/photo_manager.dart';
+import 'package:geocoding/geocoding.dart';
 
 /// Immutable snapshot of the whole app's navigation state. This mirrors the
 /// several `useState` calls at the top of the original `App()` component.
@@ -16,12 +19,14 @@ class AppState {
   final ReviewResult? reviewResult;
   final List<Photo> deleteQueue;
   final bool galleryLoading;
+  final List<LocationGroup> locationGroups;
 
   const AppState({
     required this.screen,
     required this.activeTab,
     required this.swipeCtx,
     required this.reviewCounts,
+    required this.locationGroups,
     required this.deleteQueue,
     required this.reviewResult,
     required this.galleryLoading,
@@ -34,6 +39,7 @@ class AppState {
         swipeCtx: null,
         reviewResult: null,
         deleteQueue: const [],
+        locationGroups: [],
         reviewCounts: {
           PhotoAction.keep: 0,
           PhotoAction.delete: 0,
@@ -56,6 +62,7 @@ class AppState {
     SwipeContext? swipeCtx,
     bool clearSwipeCtx = false,
     Map<PhotoAction, int>? reviewCounts,
+    List<LocationGroup>? locationGroups,
     ReviewResult? reviewResult,
     List<Photo>? deleteQueue,
     bool? galleryLoading,
@@ -68,6 +75,7 @@ class AppState {
       reviewCounts: reviewCounts ?? this.reviewCounts,
       deleteQueue: deleteQueue ?? this.deleteQueue,
       galleryLoading: galleryLoading ?? this.galleryLoading,
+      locationGroups: locationGroups ?? this.locationGroups,
     );
   }
 }
@@ -78,9 +86,12 @@ class AppController extends StateNotifier<AppState> {
   final GalleryService _galleryService = GalleryService();
   final HiddenPhotoService _hiddenPhotoService =
       HiddenPhotoService();
-
+  final Geocoding _geocoding = Geocoding();
   List<Photo>? _galleryPhotos;
+  final Map<String, ({double latitude, double longitude})?>
+    _locationCache = {};
   List<Photo> _favoritePhotos = [];
+  
 
   List<Photo> get favoritePhotos => _favoritePhotos;
 
@@ -199,7 +210,8 @@ class AppController extends StateNotifier<AppState> {
     state = state.copyWith(swipeCtx: ctx, screen: AppScreen.swipe);
   }
 
-  void selectReviewMode(ReviewMode mode) {
+
+  Future<void> selectReviewMode(ReviewMode mode) async {
     if (mode == ReviewMode.date) {
       state = state.copyWith(
         screen: AppScreen.reviewDate,
@@ -208,9 +220,175 @@ class AppController extends StateNotifier<AppState> {
     }
 
     if (mode == ReviewMode.location) {
+      final permission =
+          await Permission.accessMediaLocation.request();
+
+      if (!permission.isGranted) {
+        return;
+      }
+
+      final gallery = _galleryPhotos ?? <Photo>[];
+
+      final Map<String, List<Photo>> grouped = {};
+
+      const int batchSize = 5;
+
+      for (int start = 0;
+          start < gallery.length;
+          start += batchSize) {
+        final end = (start + batchSize > gallery.length)
+            ? gallery.length
+            : start + batchSize;
+
+        final batch = gallery.sublist(start, end);
+
+        final results = await Future.wait(
+          batch.map((photo) async {
+            final asset = photo.asset;
+
+            if (asset == null) {
+              return null;
+            }
+
+            final assetId = asset.id;
+
+            // Use cached location if we already read this photo.
+            if (_locationCache.containsKey(assetId)) {
+              final cached = _locationCache[assetId];
+
+              if (cached == null) {
+                return null;
+              }
+
+              return (
+                photo: photo,
+                latitude: cached.latitude,
+                longitude: cached.longitude,
+              );
+            }
+
+            // First time seeing this photo: read GPS metadata.
+            final location = await asset.latlngAsync();
+
+            if (location == null) {
+              _locationCache[assetId] = null;
+              return null;
+            }
+
+            final cachedLocation = (
+              latitude: location.latitude,
+              longitude: location.longitude,
+            );
+
+            _locationCache[assetId] = cachedLocation;
+
+            return (
+              photo: photo,
+              latitude: cachedLocation.latitude,
+              longitude: cachedLocation.longitude,
+            );
+          }),
+        );
+
+        for (final result in results) {
+          if (result == null) {
+            continue;
+          }
+
+          final latitude =
+              result.latitude.toStringAsFixed(3);
+
+          final longitude =
+              result.longitude.toStringAsFixed(3);
+
+          final key = '$latitude,$longitude';
+
+          grouped
+              .putIfAbsent(key, () => [])
+              .add(result.photo);
+        }
+
+        debugPrint(
+          'LOCATION: processed $end/${gallery.length}',
+        );
+      }
+
+
+      final Map<String, List<Photo>> cityGroups = {};
+
+      final Map<String, String> cityKeys = {};
+
+      for (final entry in grouped.entries) {
+        final photos = entry.value;
+
+        final parts = entry.key.split(',');
+
+        if (parts.length != 2) {
+          continue;
+        }
+
+        final latitude = double.tryParse(parts[0]);
+        final longitude = double.tryParse(parts[1]);
+
+        if (latitude == null || longitude == null) {
+          continue;
+        }
+
+        String locationName = entry.key;
+
+        try {
+          final placemarks =
+              await _geocoding.placemarkFromCoordinates(
+            latitude,
+            longitude,
+          );
+
+          if (placemarks.isNotEmpty) {
+            final place = placemarks.first;
+
+            locationName =
+                place.subAdministrativeArea?.trim().isNotEmpty == true
+                    ? place.subAdministrativeArea!.trim()
+                    : place.administrativeArea?.trim().isNotEmpty == true
+                        ? place.administrativeArea!.trim()
+                        : place.locality?.trim().isNotEmpty == true
+                            ? place.locality!.trim()
+                            : entry.key;
+          }
+        } catch (_) {
+          // Keep coordinates if reverse geocoding fails.
+        }
+
+        // Normalize the name so "Kota Bandung" and
+        // "Bandung" can be treated as the same city.
+        final cityKey = locationName
+            .toLowerCase()
+            .trim();
+
+        cityGroups.putIfAbsent(cityKey, () => []).addAll(photos);
+
+        cityKeys[cityKey] = locationName;
+      }
+
+      final locationGroupsResult = cityGroups.entries.map((entry) {
+        final photos = entry.value;
+        final locationName = cityKeys[entry.key] ?? entry.key;
+
+        return LocationGroup(
+          id: 'location-${entry.key}',
+          location: locationName,
+          date: photos.first.date,
+          count: photos.length,
+          coverUrl: photos.first.url,
+          photos: photos,
+        );
+      }).toList();
+
       state = state.copyWith(
         screen: AppScreen.reviewLocation,
+        locationGroups: locationGroupsResult,
       );
+
       return;
     }
 

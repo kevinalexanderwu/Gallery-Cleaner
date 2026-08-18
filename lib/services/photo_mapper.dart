@@ -82,4 +82,53 @@ class PhotoMapper {
     if (dt == null) return _unknownMonth;
     return '${_fullMonthNames[dt.month - 1]} ${dt.year}';
   }
+  static Future<Photo> fromAssetEntityWithLocation(
+    AssetEntity asset,
+  ) async {
+    final DateTime? createdAt = asset.createDateTime;
+
+    final location = await asset.latlngAsync();
+
+    String locationText = _unknownLocation;
+
+    if (location != null) {
+      locationText =
+          '${location.latitude},${location.longitude}';
+    }
+
+    final String resolution =
+        (asset.width > 0 && asset.height > 0)
+            ? '${asset.width} × ${asset.height}'
+            : 'Unknown resolution';
+
+    return Photo(
+      id: asset.id,
+      url: _placeholderUrl,
+      date: _formatDate(createdAt),
+      location: locationText,
+      size: _unknownSize,
+      month: _formatMonth(createdAt),
+      camera: null,
+      lens: null,
+      aperture: null,
+      shutter: null,
+      iso: null,
+      resolution: resolution,
+      asset: asset,
+    );
+  }
+
+  static Future<List<Photo>> fromAssetEntitiesWithLocation(
+    List<AssetEntity> assets,
+  ) async {
+    final List<Photo> photos = [];
+
+    for (final asset in assets) {
+      photos.add(
+        await fromAssetEntityWithLocation(asset),
+      );
+    }
+
+    return photos;
+  }
 }

@@ -1,26 +1,32 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../theme.dart';
 import '../utils.dart';
-import '../widgets/net_image.dart';
+import '../state/app_controller.dart';
+import 'package:photo_manager/photo_manager.dart';
+import 'dart:typed_data';
 
-class ReviewByLocationScreen extends StatelessWidget {
+class ReviewByLocationScreen extends ConsumerWidget {
   final ValueChanged<LocationGroup> onStart;
   final VoidCallback onBack;
   const ReviewByLocationScreen({super.key, required this.onStart, required this.onBack});
 
   @override
-  Widget build(BuildContext context) {
+ Widget build(BuildContext context, WidgetRef ref) {
+  final locationGroups =
+    ref.watch(appControllerProvider).locationGroups;
     return Container(
       color: AppColors.bgFaint,
       child: Column(
         children: [
           Container(
-            color: Colors.white,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.divider)),
+              color: Colors.white,
+              border: Border(
+                bottom: BorderSide(color: AppColors.divider),
+              ),
             ),
             child: Row(
               children: [
@@ -31,12 +37,18 @@ class ReviewByLocationScreen extends StatelessWidget {
                   icon: const Icon(Icons.chevron_left, size: 24, color: AppColors.ink),
                 ),
                 const SizedBox(width: 8),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('By Location', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.ink, letterSpacing: -0.3, height: 1)),
                     SizedBox(height: 2),
-                    Text('6 places', style: TextStyle(fontSize: 12, color: AppColors.grey400)),
+                    Text(
+                      '${locationGroups.length} places',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.grey400,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -63,7 +75,9 @@ class ReviewByLocationScreen extends StatelessWidget {
                       children: [
                         AspectRatio(
                           aspectRatio: 100 / 52,
-                          child: Container(color: const Color(0xFFEBEBEB), child: NetImage(url: group.coverUrl)),
+                          child: _LocationCoverPhoto(
+                            photo: group.photos.first,
+                          ),
                         ),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -91,6 +105,62 @@ class ReviewByLocationScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LocationCoverPhoto extends StatelessWidget {
+  final Photo photo;
+
+  const _LocationCoverPhoto({
+    required this.photo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = photo.asset;
+
+    if (asset == null) {
+      return Container(
+        color: const Color(0xFFEBEBEB),
+      );
+    }
+
+    return FutureBuilder<Uint8List?>(
+      future: asset.thumbnailDataWithSize(
+        const ThumbnailSize(800, 420),
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            color: const Color(0xFFEBEBEB),
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          );
+        }
+
+        final bytes = snapshot.data;
+
+        if (bytes == null) {
+          return Container(
+            color: const Color(0xFFEBEBEB),
+          );
+        }
+
+        return Image.memory(
+          bytes,
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.cover,
+        );
+      },
     );
   }
 }
