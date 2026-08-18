@@ -4,6 +4,7 @@ import '../models/models.dart';
 import '../services/gallery_service.dart';
 import '../services/photo_mapper.dart';
 import '../services/hidden_photo_service.dart';
+import 'package:flutter/foundation.dart';
 
 /// Immutable snapshot of the whole app's navigation state. This mirrors the
 /// several `useState` calls at the top of the original `App()` component.
@@ -72,14 +73,19 @@ class AppState {
 }
 
 class AppController extends StateNotifier<AppState> {
+  final Set<String> _hiddenPhotoUrls = {};
+  Set<String> get hiddenPhotoIds => _hiddenPhotoIds;
   final GalleryService _galleryService = GalleryService();
   final HiddenPhotoService _hiddenPhotoService =
       HiddenPhotoService();
 
   List<Photo>? _galleryPhotos;
+  List<Photo> _favoritePhotos = [];
+
+  List<Photo> get favoritePhotos => _favoritePhotos;
 
   Set<String> _hiddenPhotoIds = {};
-
+  Set<String> get hiddenPhotoUrls => _hiddenPhotoUrls;
   List<Photo>? get galleryPhotos => _galleryPhotos;
 
   AppController() : super(AppState.initial()) {
@@ -96,20 +102,39 @@ class AppController extends StateNotifier<AppState> {
       final DateTime threeMonthsAgo =
           DateTime.now().subtract(const Duration(days: 90));
 
-      final albums =
-          await _galleryService.getAlbums(createdAfter: threeMonthsAgo);
+      debugPrint('GALLERY: requesting albums...');
+
+      final albums = await _galleryService.getAlbums(
+        createdAfter: threeMonthsAgo,
+      );
+
+      debugPrint('GALLERY: albums found = ${albums.length}');
 
       for (final album in albums) {
         final assets = await _galleryService.getAssetsFromAlbum(album);
 
+        debugPrint(
+          'GALLERY: album=${album.name} assets=${assets.length}',
+        );
+
         final withinWindow = assets.where((a) {
           final DateTime? createdAt = a.createDateTime;
+
           return createdAt != null &&
               !createdAt.isBefore(threeMonthsAgo);
         }).toList();
 
+        debugPrint(
+          'GALLERY: within 3 months = ${withinWindow.length}',
+        );
+
         if (withinWindow.isNotEmpty) {
-          _galleryPhotos = PhotoMapper.fromAssetEntities(withinWindow);
+          _galleryPhotos =
+              PhotoMapper.fromAssetEntities(withinWindow);
+
+          debugPrint(
+            'GALLERY: loaded ${_galleryPhotos!.length} photos',
+          );
 
           state = state.copyWith(
             galleryLoading: false,
@@ -118,8 +143,19 @@ class AppController extends StateNotifier<AppState> {
           return;
         }
       }
-    } catch (_) {
-      // Permission denied or any failure.
+
+      debugPrint('GALLERY: no photos found in last 3 months');
+
+      state = state.copyWith(
+        galleryLoading: false,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('GALLERY ERROR: $e');
+      debugPrint('$stackTrace');
+
+      state = state.copyWith(
+        galleryLoading: false,
+      );
     }
   }
 
@@ -206,7 +242,19 @@ class AppController extends StateNotifier<AppState> {
   }
 
   void startDateGroup(DateGroup g) {
-    _enterSwipe(SwipeContext(mode: ReviewMode.date, title: g.month, subtitle: g.location, photos: g.photos, total: g.count));
+    final photos = g.photos
+        .where((photo) => !_hiddenPhotoIds.contains(photo.id))
+        .toList();
+
+    _enterSwipe(
+      SwipeContext(
+        mode: ReviewMode.date,
+        title: g.month,
+        subtitle: g.location,
+        photos: photos,
+        total: photos.length,
+      ),
+    );
   }
 
   void startLocationGroup(LocationGroup g) {
@@ -260,6 +308,15 @@ class AppController extends StateNotifier<AppState> {
   }
 
   void swipeDone(ReviewResult result) {
+    final existingIds =
+        _favoritePhotos.map((photo) => photo.id).toSet();
+
+    for (final photo in result.favoritePhotos) {
+      if (!existingIds.contains(photo.id)) {
+        _favoritePhotos.add(photo);
+      }
+    }
+
     state = state.copyWith(
       reviewCounts: result.counts,
       reviewResult: result,
@@ -319,27 +376,22 @@ class AppController extends StateNotifier<AppState> {
     );
   }
 
-  Future<void> deleteSelected(List indexes) async {
+  void deleteSelected(List indexes) {
     final queue = [...state.deleteQueue];
 
-    final selectedPhotos = <Photo>[];
+    for (final i in indexes) {
+      if (i >= 0 && i < queue.length) {
+        final photo = queue[i];
 
-    for (final index in indexes) {
-      if (index >= 0 && index < queue.length) {
-        selectedPhotos.add(queue[index]);
+        _hiddenPhotoIds.add(photo.id);
       }
     }
 
-    if (selectedPhotos.isEmpty) return;
+    indexes.sort((a, b) => b.compareTo(a));
 
-    await hidePhotos(selectedPhotos);
-
-    final sortedIndexes = [...indexes]
-      ..sort((a, b) => b.compareTo(a));
-
-    for (final index in sortedIndexes) {
-      if (index >= 0 && index < queue.length) {
-        queue.removeAt(index);
+    for (final i in indexes) {
+      if (i >= 0 && i < queue.length) {
+        queue.removeAt(i);
       }
     }
 

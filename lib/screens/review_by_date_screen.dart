@@ -42,9 +42,21 @@ class ReviewByDateScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final List<Photo>? realPhotos = ref.read(appControllerProvider.notifier).galleryPhotos;
-    final bool useReal = realPhotos != null && realPhotos.isNotEmpty;
-    final List<DateGroup> groups = useReal ? _buildRealGroups(realPhotos) : dateGroups;
+    final controller = ref.read(appControllerProvider.notifier);
+
+    final List<Photo>? realPhotos = controller.galleryPhotos;
+
+    final hiddenIds = controller.hiddenPhotoIds;
+
+    final List<Photo> filteredPhotos = realPhotos
+            ?.where((photo) => !hiddenIds.contains(photo.id))
+            .toList() ??
+        <Photo>[];
+
+    final bool useReal = filteredPhotos.isNotEmpty;
+
+    final List<DateGroup> groups =
+        useReal ? _buildRealGroups(filteredPhotos) : dateGroups;
 
     return Container(
       color: Colors.white,

@@ -6,20 +6,50 @@ import '../state/app_controller.dart';
 import '../theme.dart';
 import '../widgets/net_image.dart';
 import 'photo_preview_screen.dart';
+import 'favorites_screen.dart';
 
 class GalleryScreen extends ConsumerWidget {
   final VoidCallback onReview;
   const GalleryScreen({super.key, required this.onReview});
+  String _photoKey(String url) {
+    return url.split('?').first.trim().toLowerCase();
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(appControllerProvider);
-    final List<Photo>? realPhotos =
-        ref.read(appControllerProvider.notifier).galleryPhotos;
+    final controller = ref.read(appControllerProvider.notifier);
 
-    final bool loading = state.galleryLoading;
-    final bool useRealPhotos =
-        realPhotos != null && realPhotos.isNotEmpty;
+    final List<Photo>? realPhotos = controller.galleryPhotos;
+
+    final hiddenIds = controller.hiddenPhotoIds;
+
+    final filteredRealPhotos = realPhotos
+            ?.where((photo) => !hiddenIds.contains(photo.id))
+            .toList() ??
+        <Photo>[];
+
+    final bool useRealPhotos = filteredRealPhotos.isNotEmpty;
+    List<GalleryGroup> filterDummyGroups(
+      Set<String> hiddenUrls,
+    ) {
+      return galleryGroups
+          .map(
+            (group) {
+              final photos = group.photos.where((photo) {
+                final baseUrl = photo.url.split('?').first;
+                return !hiddenUrls.contains(baseUrl);
+              }).toList();
+
+              return GalleryGroup(
+                month: group.month,
+                photos: photos,
+              );
+            },
+          )
+          .where((group) => group.photos.isNotEmpty)
+          .toList();
+    }
 
     return Container(
       color: Colors.white,
@@ -36,27 +66,52 @@ class GalleryScreen extends ConsumerWidget {
                   children: [
                     const Text(
                       'Photos',
-                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: AppColors.ink, letterSpacing: -0.4, height: 1),
-                    ),
-                    OutlinedButton(
-                      onPressed: onReview,
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.grey50,
-                        foregroundColor: AppColors.ink,
-                        side: BorderSide.none,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink,
                       ),
-                      child: const Text('Review', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                    ),
+
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.favorite,
+                            color: Colors.red,
+                          ),
+                          onPressed: () {
+                            final controller =
+                                ref.read(appControllerProvider.notifier);
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => FavoritesScreen(
+                                  photos: controller.favoritePhotos,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                        OutlinedButton(
+                          onPressed: onReview,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: AppColors.grey50,
+                            foregroundColor: AppColors.ink,
+                            side: BorderSide.none,
+                          ),
+                          child: const Text('Review'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Text(
                   useRealPhotos
-                      ? '${realPhotos.length} photos · Last 3 Months'
+                      ? '${filteredRealPhotos.length} photos · Last 3 Months'
                       : '1,287 photos · 48.3 GB',
                   style: const TextStyle(
                     fontSize: 13,
@@ -66,15 +121,8 @@ class GalleryScreen extends ConsumerWidget {
               ],
             ),
           ),
-          if (loading)
-            const Padding(
-              padding: EdgeInsets.only(top: 80),
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (useRealPhotos)
-            for (final entry in _groupByMonth(realPhotos).entries)
+          if (useRealPhotos)
+            for (final entry in _groupByMonth(filteredRealPhotos).entries)
               _MonthSectionPhotos(
                 month: entry.key,
                 photos: entry.value,
@@ -208,7 +256,38 @@ class _MonthSection extends StatelessWidget {
             ),
             itemBuilder: (context, i) {
               final p = group.photos[i];
-              return SquareThumb(url: p.url);
+
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PhotoPreviewScreen(
+                        photos: group.photos
+                            .map(
+                              (thumb) => Photo(
+                                id: thumb.id,
+                                url: thumb.url,
+                                asset: null,
+                                month: group.month,
+                                date: group.month,
+                                location: 'Demo',
+                                size: '0',
+                              ),
+                            )
+                            .toList(),
+                        initialIndex: i,
+                      ),
+                    ),
+                  );
+                },
+                child: Hero(
+                  tag: p.id,
+                  child: SquareThumb(
+                    url: p.url,
+                  ),
+                ),
+              );
             },
           ),
         ),
