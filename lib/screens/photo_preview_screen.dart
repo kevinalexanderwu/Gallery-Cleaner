@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 import '../models/models.dart';
 import '../widgets/media_preview.dart';
@@ -49,7 +50,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
         elevation: 0,
         centerTitle: true,
         title: Text(
-          "${_currentIndex + 1} / ${widget.photos.length}",
+          '${_currentIndex + 1} / ${widget.photos.length}',
         ),
       ),
 
@@ -66,10 +67,32 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
         itemBuilder: (context, index) {
           final photo = widget.photos[index];
 
+          final isVideo =
+              photo.asset?.type == AssetType.video;
+
+          // VIDEO
+          if (isVideo) {
+            return Center(
+              child: Hero(
+                tag: photo.id,
+                child: MediaPreview(
+                  asset: photo.asset,
+                  url: photo.url,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            );
+          }
+
+          // PHOTO
           return Center(
             child: InteractiveViewer(
-              minScale: 1,
-              maxScale: 5,
+              minScale: 1.0,
+              maxScale: 5.0,
+              panEnabled: true,
+              scaleEnabled: true,
+              boundaryMargin: const EdgeInsets.all(100),
+              clipBehavior: Clip.none,
               child: Hero(
                 tag: photo.id,
                 child: MediaPreview(

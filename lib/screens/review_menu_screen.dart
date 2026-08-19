@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../state/app_controller.dart';
 import '../theme.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 class _ReviewModeItem {
   final ReviewMode id;
@@ -40,6 +41,7 @@ class ReviewMenuScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final List<Photo>? realPhotos = ref.read(appControllerProvider.notifier).galleryPhotos;
+    final controller = ref.read(appControllerProvider.notifier);
 
     final int totalPhotos = realPhotos?.length ?? 0;
 
@@ -75,10 +77,12 @@ class ReviewMenuScreen extends ConsumerWidget {
         icon: Icons.image_outlined,
       ),
 
-      const _ReviewModeItem(
+      _ReviewModeItem(
         id: ReviewMode.largeVideos,
-        label: 'Review Large Videos',
-        hint: 'Coming Soon',
+        label: 'Review Videos',
+        hint: '${controller.galleryPhotos?.where(
+          (photo) => photo.asset?.type == AssetType.video,
+        ).length ?? 0} videos',
         icon: Icons.movie_outlined,
       ),
 

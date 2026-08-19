@@ -116,6 +116,14 @@ class AppController extends StateNotifier<AppState> {
   List<Photo> _screenshotPhotos = [];
 
   List<Photo> get screenshotPhotos => _screenshotPhotos;
+  int get videoCount {
+    return _galleryPhotos
+            ?.where(
+              (photo) => photo.asset?.type == AssetType.video,
+            )
+            .length ??
+        0;
+  }
 
   AppController() : super(AppState.initial()) {
     _loadGalleryPhotos();
@@ -477,8 +485,27 @@ class AppController extends StateNotifier<AppState> {
     }
 
     final List<Photo>? gallery = _galleryPhotos;
+
     final bool useGallery =
         gallery != null && gallery.isNotEmpty;
+
+    final List<Photo> videoPhotos = useGallery
+        ? gallery
+            .where((photo) => photo.asset?.type == AssetType.video)
+            .where(
+              (photo) => !_hiddenPhotoIds.contains(photo.id),
+            )
+            .toList()
+        : bandungPhotos;
+    final List<Photo> surpriseSelection = useGallery
+        ? (List<Photo>.from(gallery)
+          ..removeWhere(
+            (photo) => _hiddenPhotoIds.contains(photo.id),
+          )
+          ..shuffle())
+            .take(30)
+            .toList()
+        : surprisePhotos;
 
     final Map<ReviewMode, SwipeContext> configs = {
       ReviewMode.duplicates: SwipeContext(
@@ -499,18 +526,18 @@ class AppController extends StateNotifier<AppState> {
 
       ReviewMode.largeVideos: SwipeContext(
         mode: mode,
-        title: 'Large Videos',
-        subtitle: '12 videos · 1.8 GB',
-        photos: useGallery ? gallery : bandungPhotos,
-        total: 12,
+        title: 'Review Videos',
+        subtitle: '${videoPhotos.length} videos',
+        photos: videoPhotos,
+        total: videoPhotos.length,
       ),
 
       ReviewMode.surprise: SwipeContext(
         mode: mode,
         title: 'Surprise Me',
-        subtitle: 'Random selection',
-        photos: useGallery ? gallery : surprisePhotos,
-        total: 48,
+        subtitle: '${surpriseSelection.length} random photos',
+        photos: surpriseSelection,
+        total: surpriseSelection.length,
       ),
     };
 

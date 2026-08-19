@@ -171,10 +171,17 @@ class _MediaPreviewState extends State<MediaPreview> {
 
     // IMAGE
     if (asset != null) {
+      final size = asset.orientatedSize;
+
+      final isLandscape =
+          size.width > size.height;
+
       return AssetEntityImage(
         asset,
-        isOriginal: false,
-        fit: widget.fit,
+        isOriginal: true,
+        fit: isLandscape
+            ? BoxFit.contain
+            : BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
       );
