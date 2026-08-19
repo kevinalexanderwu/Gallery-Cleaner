@@ -4,6 +4,7 @@ import '../../theme.dart';
 import '../../widgets/net_image.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
+import '../../widgets/media_preview.dart';
 
 enum _DragDir { up, down, left, right }
 
@@ -299,12 +300,12 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              NetImage(
-                url: widget.photo.url,
+              MediaPreview(
                 asset: widget.photo.asset,
-                original: true,
+                url: widget.photo.url,
+                fit: BoxFit.contain,
               ),
-                if (_showHeart)
+                  if (_showHeart)
                   IgnorePointer(
                     child: Center(
                       child: Transform.scale(
@@ -344,7 +345,7 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
                 ),
               if (_dragDir == _DragDir.right)
                 Positioned(
-                  right: 20,
+                  left: 20,
                   top: 0,
                   bottom: 0,
                   child: Center(
@@ -367,7 +368,7 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
                 ),
               if (_dragDir == _DragDir.left)
                 Positioned(
-                  left: 20,
+                  right: 20,
                   top: 0,
                   bottom: 0,
                   child: Center(

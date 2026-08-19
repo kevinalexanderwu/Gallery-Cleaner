@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
-import '../widgets/net_image.dart';
+import '../widgets/media_preview.dart';
 
 class PhotoPreviewScreen extends StatefulWidget {
   final List<Photo> photos;
@@ -72,11 +72,11 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
               maxScale: 5,
               child: Hero(
                 tag: photo.id,
-                child: NetImage(
-                  url: photo.url,
+                child: MediaPreview(
                   asset: photo.asset,
-                  original: true,
-                )
+                  url: photo.url,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           );

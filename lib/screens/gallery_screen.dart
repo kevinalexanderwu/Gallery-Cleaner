@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../widgets/net_image.dart';
 import 'photo_preview_screen.dart';
 import 'favorites_screen.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 class GalleryScreen extends ConsumerWidget {
   final VoidCallback onReview;
@@ -276,12 +277,32 @@ class _DateSectionPhotos extends StatelessWidget {
                     ),
                   );
                 },
-                child: Hero(
-                  tag: p.id,
-                  child: SquareThumb(
-                    url: p.url,
-                    asset: p.asset,
-                  ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    SquareThumb(
+                      url: p.url,
+                      asset: p.asset,
+                    ),
+
+                    if (p.asset?.type == AssetType.video)
+                      const Center(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               );
             },
