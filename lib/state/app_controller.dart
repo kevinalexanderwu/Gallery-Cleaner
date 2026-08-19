@@ -21,6 +21,8 @@ class AppState {
   final List<Photo> deleteQueue;
   final bool galleryLoading;
   final List<LocationGroup> locationGroups;
+  final int locationProgress;
+  final int locationTotal;
 
   const AppState({
     required this.screen,
@@ -31,6 +33,8 @@ class AppState {
     required this.deleteQueue,
     required this.reviewResult,
     required this.galleryLoading,
+    this.locationProgress = 0,
+    this.locationTotal = 0,
   });
 
   factory AppState.initial() => const AppState(
@@ -67,6 +71,8 @@ class AppState {
     ReviewResult? reviewResult,
     List<Photo>? deleteQueue,
     bool? galleryLoading,
+    int? locationProgress,
+    int? locationTotal,
   }) {
     return AppState(
       reviewResult: reviewResult ?? this.reviewResult,
@@ -77,6 +83,11 @@ class AppState {
       deleteQueue: deleteQueue ?? this.deleteQueue,
       galleryLoading: galleryLoading ?? this.galleryLoading,
       locationGroups: locationGroups ?? this.locationGroups,
+      locationProgress:
+          locationProgress ?? this.locationProgress,
+
+      locationTotal:
+          locationTotal ?? this.locationTotal,
     );
   }
 }
@@ -234,12 +245,16 @@ class AppController extends StateNotifier<AppState> {
         return;
       }
 
+      final gallery = _galleryPhotos ?? <Photo>[];
+
       state = state.copyWith(
         screen: AppScreen.reviewLocation,
         locationGroups: [],
+        locationProgress: 0,
+        locationTotal: gallery.length,
       );
 
-      final gallery = _galleryPhotos ?? <Photo>[];
+      
 
       final Map<String, List<Photo>> grouped = {};
 
@@ -360,6 +375,10 @@ class AppController extends StateNotifier<AppState> {
               .putIfAbsent(key, () => [])
               .add(result.photo);
         }
+
+        state = state.copyWith(
+          locationProgress: end,
+        );
 
         debugPrint(
           'LOCATION: processed $end/${gallery.length}',

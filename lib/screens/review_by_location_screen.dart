@@ -14,8 +14,11 @@ class ReviewByLocationScreen extends ConsumerWidget {
 
   @override
  Widget build(BuildContext context, WidgetRef ref) {
-  final locationGroups =
-    ref.watch(appControllerProvider).locationGroups;
+  final state = ref.watch(appControllerProvider);
+  final locationGroups = state.locationGroups;
+  final isLoadingLocation =
+    state.locationTotal > 0 &&
+    state.locationProgress < state.locationTotal;
     return Container(
       color: AppColors.bgFaint,
       child: Column(
@@ -55,30 +58,61 @@ class ReviewByLocationScreen extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: locationGroups.isEmpty
-              ? const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
+            child: isLoadingLocation
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        'Finding locations...',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.grey500,
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Finding locations...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.ink,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-        )
-            : ListView.separated(
+                        const SizedBox(height: 6),
+                        Text(
+                          '${state.locationProgress} / '
+                          '${state.locationTotal} photos',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.grey500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: 180,
+                          child: LinearProgressIndicator(
+                            value: state.locationTotal == 0
+                                ? 0
+                                : state.locationProgress /
+                                    state.locationTotal,
+                            minHeight: 4,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : locationGroups.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No locations found',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.grey500,
+                          ),
+                        ),
+                      )
+          : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: locationGroups.length,
               separatorBuilder: (context, i) => const SizedBox(height: 12),
