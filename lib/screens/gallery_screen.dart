@@ -121,7 +121,14 @@ class GalleryScreen extends ConsumerWidget {
               ],
             ),
           ),
-          if (useRealPhotos)
+          if (state.galleryLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 80),
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (useRealPhotos)
             for (final entry in _groupByMonth(filteredRealPhotos).entries)
               _MonthSectionPhotos(
                 month: entry.key,

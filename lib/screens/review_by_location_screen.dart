@@ -55,7 +55,30 @@ class ReviewByLocationScreen extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: ListView.separated(
+            child: locationGroups.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'Finding locations...',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.grey500,
+                        ),
+                      ),
+                    ],
+                  ),
+        )
+            : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: locationGroups.length,
               separatorBuilder: (context, i) => const SizedBox(height: 12),

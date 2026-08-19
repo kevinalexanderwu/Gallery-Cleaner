@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:geocoding/geocoding.dart';
+import '../services/location_cache_service.dart';
 
 /// Immutable snapshot of the whole app's navigation state. This mirrors the
 /// several `useState` calls at the top of the original `App()` component.
@@ -90,6 +91,8 @@ class AppController extends StateNotifier<AppState> {
   List<Photo>? _galleryPhotos;
   final Map<String, ({double latitude, double longitude})?>
     _locationCache = {};
+  final LocationCacheService _locationCacheService =
+    LocationCacheService();
   List<Photo> _favoritePhotos = [];
   
 
@@ -149,6 +152,10 @@ class AppController extends StateNotifier<AppState> {
 
           debugPrint(
             'GALLERY: loaded ${_galleryPhotos!.length} photos',
+          );
+
+          state = state.copyWith(
+            galleryLoading: false,
           );
 
           final screenshotAssets =
@@ -227,9 +234,42 @@ class AppController extends StateNotifier<AppState> {
         return;
       }
 
+      state = state.copyWith(
+        screen: AppScreen.reviewLocation,
+        locationGroups: [],
+      );
+
       final gallery = _galleryPhotos ?? <Photo>[];
 
       final Map<String, List<Photo>> grouped = {};
+
+      // Load persistent location cache.
+      final persistentCache =
+          await _locationCacheService.loadCache();
+
+      for (final entry in persistentCache.entries) {
+        final value = entry.value;
+
+        if (value == null) {
+          _locationCache[entry.key] = null;
+          continue;
+        }
+
+        if (value is Map) {
+          final latitude =
+              (value['latitude'] as num?)?.toDouble();
+
+          final longitude =
+              (value['longitude'] as num?)?.toDouble();
+
+          if (latitude != null && longitude != null) {
+            _locationCache[entry.key] = (
+              latitude: latitude,
+              longitude: longitude,
+            );
+          }
+        }
+      }
 
       const int batchSize = 5;
 
@@ -281,6 +321,19 @@ class AppController extends StateNotifier<AppState> {
             );
 
             _locationCache[assetId] = cachedLocation;
+            await _locationCacheService.saveCache(
+              _locationCache.map(
+                (key, value) => MapEntry(
+                  key,
+                  value == null
+                      ? null
+                      : {
+                          'latitude': value.latitude,
+                          'longitude': value.longitude,
+                        },
+                ),
+              ),
+            );
 
             return (
               photo: photo,
@@ -369,7 +422,19 @@ class AppController extends StateNotifier<AppState> {
 
         cityKeys[cityKey] = locationName;
       }
-
+      await _locationCacheService.saveCache(
+        _locationCache.map(
+          (key, value) => MapEntry(
+            key,
+            value == null
+                ? null
+                : {
+                    'latitude': value.latitude,
+                    'longitude': value.longitude,
+                  },
+          ),
+        ),
+      );
       final locationGroupsResult = cityGroups.entries.map((entry) {
         final photos = entry.value;
         final locationName = cityKeys[entry.key] ?? entry.key;
