@@ -1,4 +1,4 @@
-# gallery_cleaner_new
+# Gallery Cleaner
 
 A new Flutter project.
 
