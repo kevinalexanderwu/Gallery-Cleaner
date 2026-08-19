@@ -320,7 +320,7 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
 
               if (_dragDir == _DragDir.up)
                 Positioned(
-                  top: 28,
+                  bottom: 28,
                   left: 0,
                   right: 0,
                   child: Center(
@@ -332,7 +332,7 @@ class _SwipePhotoState extends State<SwipePhoto> with TickerProviderStateMixin {
                 ),
               if (_dragDir == _DragDir.down)
                 Positioned(
-                  bottom: 28,
+                  top: 28,
                   left: 0,
                   right: 0,
                   child: Center(
