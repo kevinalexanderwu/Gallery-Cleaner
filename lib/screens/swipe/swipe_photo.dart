@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/models.dart';
 import '../../theme.dart';
 import '../../widgets/media_preview.dart';
+import '../../state/app_controller.dart';
 
 enum _DragDir { up, down, left, right }
 
@@ -492,6 +493,11 @@ class _SwipePhotoState extends State<SwipePhoto>
 
     final delCfg =
         actionConfig[PhotoAction.delete]!;
+    
+    return Consumer(
+      builder: (context, ref, child) {
+        final showSwipeHints =
+          ref.watch(settingsControllerProvider).swipeHints;
 
       return LayoutBuilder(
         builder: (context, constraints) {
@@ -582,7 +588,7 @@ class _SwipePhotoState extends State<SwipePhoto>
               // KEEP HINT
               // ------------------------------------------------
 
-              if (_dragDir == _DragDir.up)
+              if (showSwipeHints && _dragDir == _DragDir.up)
                 Positioned(
                   bottom: 28,
                   left: 0,
@@ -604,7 +610,7 @@ class _SwipePhotoState extends State<SwipePhoto>
               // DELETE HINT
               // ------------------------------------------------
 
-              if (_dragDir == _DragDir.down)
+              if (showSwipeHints && _dragDir == _DragDir.down)
                 Positioned(
                   top: 28,
                   left: 0,
@@ -626,7 +632,7 @@ class _SwipePhotoState extends State<SwipePhoto>
               // DETAILS HINT
               // ------------------------------------------------
 
-              if (_dragDir == _DragDir.right)
+              if (showSwipeHints && _dragDir == _DragDir.right)
                 Positioned(
                   left: 20,
                   top: 0,
@@ -667,7 +673,7 @@ class _SwipePhotoState extends State<SwipePhoto>
               // FOR LATER HINT
               // ------------------------------------------------
 
-              if (_dragDir == _DragDir.left)
+              if (showSwipeHints && _dragDir == _DragDir.left)
                 Positioned(
                   right: 20,
                   top: 0,
@@ -746,6 +752,8 @@ class _SwipePhotoState extends State<SwipePhoto>
           ),
         ),
           ),
+        );
+          },
         );
       },
     );
