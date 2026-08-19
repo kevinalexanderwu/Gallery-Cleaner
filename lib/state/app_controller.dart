@@ -19,6 +19,7 @@ class AppState {
   final Map<PhotoAction, int> reviewCounts;
   final ReviewResult? reviewResult;
   final List<Photo> deleteQueue;
+  final List<Photo> favoritePhotos;
   final bool galleryLoading;
   final List<LocationGroup> locationGroups;
   final int locationProgress;
@@ -26,6 +27,7 @@ class AppState {
 
   const AppState({
     required this.screen,
+    required this.favoritePhotos,
     required this.activeTab,
     required this.swipeCtx,
     required this.reviewCounts,
@@ -44,6 +46,7 @@ class AppState {
         swipeCtx: null,
         reviewResult: null,
         deleteQueue: const [],
+        favoritePhotos: const [],
         locationGroups: [],
         reviewCounts: {
           PhotoAction.keep: 0,
@@ -69,6 +72,7 @@ class AppState {
     Map<PhotoAction, int>? reviewCounts,
     List<LocationGroup>? locationGroups,
     ReviewResult? reviewResult,
+    List<Photo>? favoritePhotos,
     List<Photo>? deleteQueue,
     bool? galleryLoading,
     int? locationProgress,
@@ -81,6 +85,8 @@ class AppState {
       swipeCtx: clearSwipeCtx ? null : (swipeCtx ?? this.swipeCtx),
       reviewCounts: reviewCounts ?? this.reviewCounts,
       deleteQueue: deleteQueue ?? this.deleteQueue,
+      favoritePhotos:
+        favoritePhotos ?? this.favoritePhotos,
       galleryLoading: galleryLoading ?? this.galleryLoading,
       locationGroups: locationGroups ?? this.locationGroups,
       locationProgress:
@@ -105,9 +111,26 @@ class AppController extends StateNotifier<AppState> {
   final LocationCacheService _locationCacheService =
     LocationCacheService();
   List<Photo> _favoritePhotos = [];
+  void toggleFavorite(Photo photo) {
+    final favorites = [...state.favoritePhotos];
+
+    final existingIndex = favorites.indexWhere(
+      (item) => item.id == photo.id,
+    );
+
+    if (existingIndex >= 0) {
+      favorites.removeAt(existingIndex);
+    } else {
+      favorites.add(photo);
+    }
+
+    state = state.copyWith(
+      favoritePhotos: favorites,
+    );
+  }
   
 
-  List<Photo> get favoritePhotos => _favoritePhotos;
+  List<Photo> get favoritePhotos => state.favoritePhotos;
 
   Set<String> _hiddenPhotoIds = {};
   Set<String> get hiddenPhotoUrls => _hiddenPhotoUrls;
@@ -611,16 +634,19 @@ class AppController extends StateNotifier<AppState> {
   }
 
   void swipeDone(ReviewResult result) {
+    final favorites = [...state.favoritePhotos];
+
     final existingIds =
-        _favoritePhotos.map((photo) => photo.id).toSet();
+        favorites.map((photo) => photo.id).toSet();
 
     for (final photo in result.favoritePhotos) {
       if (!existingIds.contains(photo.id)) {
-        _favoritePhotos.add(photo);
+        favorites.add(photo);
       }
     }
 
     state = state.copyWith(
+      favoritePhotos: favorites,
       reviewCounts: result.counts,
       reviewResult: result,
       deleteQueue: result.deletePhotos,
