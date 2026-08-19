@@ -45,13 +45,8 @@ class ReviewMenuScreen extends ConsumerWidget {
 
     final int totalPhotos = realPhotos?.length ?? 0;
 
-    final int locationCount = realPhotos == null
-        ? 0
-        : realPhotos
-            .map((p) => p.location.trim())
-            .where((l) => l.isNotEmpty)
-            .toSet()
-            .length;
+    final int locationCount =
+      ref.watch(appControllerProvider).locationGroups.length;
 
     final List<_ReviewModeItem> reviewModes = [
       _ReviewModeItem(
@@ -64,9 +59,8 @@ class ReviewMenuScreen extends ConsumerWidget {
       _ReviewModeItem(
         id: ReviewMode.location,
         label: 'Review by Location',
-        hint: realPhotos == null
-            ? 'Using demo data'
-            : '$locationCount locations',
+        hint: '$locationCount '
+            'location${locationCount == 1 ? '' : 's'}',
         icon: Icons.location_on_outlined,
       ),
 

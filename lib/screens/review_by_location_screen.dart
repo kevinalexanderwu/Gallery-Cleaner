@@ -46,7 +46,8 @@ class ReviewByLocationScreen extends ConsumerWidget {
                     Text('By Location', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.ink, letterSpacing: -0.3, height: 1)),
                     SizedBox(height: 2),
                     Text(
-                      '${locationGroups.length} places',
+                      '${locationGroups.length} '
+                      'location${locationGroups.length == 1 ? '' : 's'}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.grey400,
